@@ -6,7 +6,7 @@
 // ============================================================
 
 export const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
 const SESSION_KEY = 'sgid_session';
 
