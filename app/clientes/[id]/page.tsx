@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { db } from '@/lib/mock-data';
+import { getClientById, updateClient } from '@/services/client-service';
+import { ClienteRol } from '@/services/types';
 
 export default function EditarClientePage() {
   const router = useRouter();
@@ -10,24 +11,41 @@ export default function EditarClientePage() {
   const id = Number(params.id);
 
   const [nombre, setNombre] = useState('');
-  const [rol, setRol] = useState<'ORIGEN' | 'DESTINO'>(
-    'ORIGEN'
-  );
+  const [rol, setRol] = useState<ClienteRol>('origen');
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    const client = db.getClientById(id);
-    if (client) {
-      setNombre(client.nombre);
-      setRol(client.rol);
-      setLoading(false);
-    }
+    const load = async () => {
+      try {
+        const client = await getClientById(id);
+        setNombre(client.Nombre);
+        setRol(client.Rol);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : 'No se pudo cargar el cliente'
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
   }, [id]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    db.updateClient(id, nombre, rol);
-    router.push('/clientes');
+    setError('');
+    setSubmitting(true);
+    try {
+      await updateClient(id, { Nombre: nombre.trim(), Rol: rol });
+      router.push('/clientes');
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'No se pudo actualizar el cliente'
+      );
+      setSubmitting(false);
+    }
   };
 
   if (loading)
@@ -44,8 +62,7 @@ export default function EditarClientePage() {
           Modificar Cliente #{id}
         </h1>
         <p className='text-xs text-muted-foreground'>
-          Actualización directa sobre la tabla relacional de
-          clientes[cite: 111].
+          Actualización directa sobre la tabla relacional de clientes.
         </p>
       </div>
 
@@ -72,19 +89,20 @@ export default function EditarClientePage() {
           </label>
           <select
             value={rol}
-            onChange={(e) =>
-              setRol(e.target.value as 'ORIGEN' | 'DESTINO')
-            }
+            onChange={(e) => setRol(e.target.value as ClienteRol)}
             className='w-full h-8 px-2 rounded-sm border border-input bg-background text-xs focus:outline-none cursor-pointer'
           >
-            <option value='ORIGEN'>
-              ORIGEN (Proveedores / Entrada de Stock)
-            </option>
-            <option value='DESTINO'>
-              DESTINO (Puntos de Entrega / Despachos)
-            </option>
+            <option value='origen'>ORIGEN (solo ingresa productos)</option>
+            <option value='destino'>DESTINO (solo recibe despachos)</option>
+            <option value='ambos'>AMBOS (ingresa y despacha)</option>
           </select>
         </div>
+
+        {error && (
+          <div className='rounded-sm border border-destructive/20 bg-destructive/10 px-2.5 py-2 text-[11px] text-destructive'>
+            {error}
+          </div>
+        )}
 
         <div className='flex justify-end space-x-2 pt-2 border-t border-border'>
           <button
@@ -96,9 +114,10 @@ export default function EditarClientePage() {
           </button>
           <button
             type='submit'
-            className='h-8 px-4 bg-primary text-primary-foreground text-xs rounded-sm font-medium'
+            disabled={submitting}
+            className='h-8 px-4 bg-primary text-primary-foreground text-xs rounded-sm font-medium disabled:opacity-50'
           >
-            Aplicar Cambios
+            {submitting ? 'Aplicando...' : 'Aplicar Cambios'}
           </button>
         </div>
       </form>

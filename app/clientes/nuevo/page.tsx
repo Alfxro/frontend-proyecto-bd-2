@@ -2,19 +2,31 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { db } from '@/lib/mock-data';
+import { createClient } from '@/services/client-service';
+import { ClienteRol } from '@/services/types';
 
 export default function NuevoClientePage() {
   const router = useRouter();
   const [nombre, setNombre] = useState('');
-  const [rol, setRol] = useState<'ORIGEN' | 'DESTINO'>(
-    'ORIGEN'
-  );
+  const [rol, setRol] = useState<ClienteRol>('origen');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    db.createClient(nombre, rol);
-    router.push('/clientes');
+    if (!nombre.trim()) {
+      setError('El nombre es obligatorio.');
+      return;
+    }
+    setError('');
+    setSubmitting(true);
+    try {
+      await createClient({ Nombre: nombre.trim(), Rol: rol });
+      router.push('/clientes');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo crear el cliente');
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -24,8 +36,7 @@ export default function NuevoClientePage() {
           Registrar Cliente
         </h1>
         <p className='text-xs text-muted-foreground'>
-          Inyección de una nueva entidad comercial al
-          catálogo[cite: 99].
+          Inyección de una nueva entidad comercial al catálogo.
         </p>
       </div>
 
@@ -53,20 +64,20 @@ export default function NuevoClientePage() {
           </label>
           <select
             value={rol}
-            onChange={(e) =>
-              setRol(e.target.value as 'ORIGEN' | 'DESTINO')
-            }
+            onChange={(e) => setRol(e.target.value as ClienteRol)}
             className='w-full h-8 px-2 rounded-sm border border-input bg-background text-xs focus:outline-none cursor-pointer'
           >
-            <option value='ORIGEN'>
-              ORIGEN (Proveedores / Entrada de Stock) [cite:
-              108]
-            </option>
-            <option value='DESTINO'>
-              DESTINO (Puntos de Entrega / Despachos)
-            </option>
+            <option value='origen'>ORIGEN (solo ingresa productos)</option>
+            <option value='destino'>DESTINO (solo recibe despachos)</option>
+            <option value='ambos'>AMBOS (ingresa y despacha)</option>
           </select>
         </div>
+
+        {error && (
+          <div className='rounded-sm border border-destructive/20 bg-destructive/10 px-2.5 py-2 text-[11px] text-destructive'>
+            {error}
+          </div>
+        )}
 
         <div className='flex justify-end space-x-2 pt-2 border-t border-border'>
           <button
@@ -78,9 +89,10 @@ export default function NuevoClientePage() {
           </button>
           <button
             type='submit'
-            className='h-8 px-4 bg-primary text-primary-foreground text-xs rounded-sm font-medium hover:opacity-90 transition-opacity'
+            disabled={submitting}
+            className='h-8 px-4 bg-primary text-primary-foreground text-xs rounded-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50'
           >
-            Guardar Cliente
+            {submitting ? 'Guardando...' : 'Guardar Cliente'}
           </button>
         </div>
       </form>

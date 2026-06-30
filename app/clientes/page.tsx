@@ -2,61 +2,53 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { getClients, deleteClient } from '@/services/client-service';
+import { Cliente } from '@/services/types';
 
-interface Client {
-  id: number;
-  name: string;
-  role: 'ORIGEN' | 'DESTINO';
-}
+const ROLE_LABEL: Record<Cliente['Rol'], string> = {
+  origen: 'ORIGEN',
+  destino: 'DESTINO',
+  ambos: 'AMBOS'
+};
 
 export default function ClientesPage() {
   const router = useRouter();
-  const [clients, setClients] = useState<Client[]>([]);
+  const [clients, setClients] = useState<Cliente[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const load = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      setClients(await getClients());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al cargar clientes');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    // Simulación de GET /clientes
-    const fetchClients = async () => {
-      const mockClients: Client[] = [
-        {
-          id: 1,
-          name: 'Distribuidora del Norte S.A.',
-          role: 'ORIGEN'
-        },
-        {
-          id: 2,
-          name: 'Logística Central S.A.',
-          role: 'DESTINO'
-        },
-        {
-          id: 3,
-          name: 'Abastecedora Grecia',
-          role: 'ORIGEN'
-        }
-      ];
-      setClients(mockClients);
-      setLoading(false);
-    };
-    fetchClients();
+    load();
   }, []);
 
-  const handleDelete = (id: number) => {
-    if (confirm('¿Está seguro de eliminar este cliente?')) {
-      setClients(clients.filter((c) => c.id !== id));
+  const handleDelete = async (id: number) => {
+    if (!confirm('¿Está seguro de eliminar este cliente?')) return;
+    try {
+      await deleteClient(id);
+      await load();
+    } catch (err) {
+      alert(
+        err instanceof Error ? err.message : 'No se pudo eliminar el cliente'
+      );
     }
   };
 
   const filteredClients = clients.filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase())
+    c.Nombre.toLowerCase().includes(search.toLowerCase())
   );
-
-  if (loading)
-    return (
-      <div className='text-xs text-muted-foreground p-4'>
-        Cargando clientes...
-      </div>
-    );
 
   return (
     <div className='space-y-4'>
@@ -66,8 +58,7 @@ export default function ClientesPage() {
             Clientes
           </h1>
           <p className='text-xs text-muted-foreground mt-0.5'>
-            Administración de entidades comerciales de
-            origen y destino.
+            Administración de entidades comerciales de origen y destino.
           </p>
         </div>
         <button
@@ -88,6 +79,12 @@ export default function ClientesPage() {
         />
       </div>
 
+      {error && (
+        <div className='rounded-sm border border-destructive/20 bg-destructive/10 px-3 py-2 text-[11px] text-destructive'>
+          {error}
+        </div>
+      )}
+
       <div className='rounded-sm border border-border bg-card overflow-x-auto'>
         <table className='w-full text-xs text-left border-collapse'>
           <thead className='bg-muted text-muted-foreground font-medium border-b border-border'>
@@ -99,46 +96,62 @@ export default function ClientesPage() {
             </tr>
           </thead>
           <tbody className='divide-y divide-border'>
-            {filteredClients.map((client) => (
-              <tr
-                key={client.id}
-                className='hover:bg-muted/40 transition-colors'
-              >
-                <td className='p-3 font-mono text-muted-foreground'>
-                  {client.id}
-                </td>
-                <td className='p-3 font-medium text-foreground'>
-                  {client.name}
-                </td>
-                <td className='p-3'>
-                  <span
-                    className={`inline-block px-2 py-0.5 text-[10px] font-medium rounded-sm ${
-                      client.role === 'ORIGEN' ?
-                        'bg-primary text-primary-foreground'
-                      : 'bg-muted text-foreground border border-border'
-                    }`}
-                  >
-                    {client.role}
-                  </span>
-                </td>
-                <td className='p-3 text-right space-x-3'>
-                  <button
-                    onClick={() =>
-                      router.push(`/clientes/${client.id}`)
-                    }
-                    className='text-foreground hover:underline cursor-pointer'
-                  >
-                    Editar
-                  </button>
-                  <button
-                    onClick={() => handleDelete(client.id)}
-                    className='text-destructive hover:underline cursor-pointer'
-                  >
-                    Eliminar
-                  </button>
+            {loading ? (
+              <tr>
+                <td colSpan={4} className='p-4 text-center text-muted-foreground'>
+                  Cargando clientes...
                 </td>
               </tr>
-            ))}
+            ) : filteredClients.length === 0 ? (
+              <tr>
+                <td colSpan={4} className='p-6 text-center text-muted-foreground'>
+                  No se encontraron clientes.
+                </td>
+              </tr>
+            ) : (
+              filteredClients.map((client) => (
+                <tr
+                  key={client.Id_Cliente}
+                  className='hover:bg-muted/40 transition-colors'
+                >
+                  <td className='p-3 font-mono text-muted-foreground'>
+                    {client.Id_Cliente}
+                  </td>
+                  <td className='p-3 font-medium text-foreground'>
+                    {client.Nombre}
+                  </td>
+                  <td className='p-3'>
+                    <span
+                      className={`inline-block px-2 py-0.5 text-[10px] font-medium rounded-sm ${
+                        client.Rol === 'origen' ?
+                          'bg-primary text-primary-foreground'
+                        : client.Rol === 'destino' ?
+                          'bg-muted text-foreground border border-border'
+                        : 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+                      }`}
+                    >
+                      {ROLE_LABEL[client.Rol]}
+                    </span>
+                  </td>
+                  <td className='p-3 text-right space-x-3'>
+                    <button
+                      onClick={() =>
+                        router.push(`/clientes/${client.Id_Cliente}`)
+                      }
+                      className='text-foreground hover:underline cursor-pointer'
+                    >
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => handleDelete(client.Id_Cliente)}
+                      className='text-destructive hover:underline cursor-pointer'
+                    >
+                      Eliminar
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

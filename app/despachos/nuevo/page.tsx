@@ -1,32 +1,61 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { db } from '@/lib/mock-data';
+import { getClients } from '@/services/client-service';
+import { createShipment } from '@/services/shipment-service';
+import { Cliente } from '@/services/types';
 
 export default function NuevoDespachoPage() {
   const router = useRouter();
-  const destinations = db
-    .getClients()
-    .filter((c) => c.rol === 'DESTINO');
-  const [selectedClient, setSelectedClient] = useState(
-    destinations[0]?.id || ''
-  );
+  const [destinations, setDestinations] = useState<Cliente[]>([]);
+  const [selectedClient, setSelectedClient] = useState<number>(0);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleCreate = (e: React.FormEvent) => {
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const clients = await getClients();
+        // Solo clientes que pueden recibir despachos: destino o ambos
+        const dest = clients.filter(
+          (c) => c.Rol === 'destino' || c.Rol === 'ambos'
+        );
+        setDestinations(dest);
+        setSelectedClient(dest[0]?.Id_Cliente ?? 0);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Error al cargar clientes');
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedClient)
-      return alert(
-        'Debe seleccionar un destino comercial.'
-      );
-
-    // Crea el documento maestro en memoria
-    const newManifest = db.createShipment(
-      Number(selectedClient)
-    );
-    // Redirige inmediatamente a la gestión de sus partidas físicas
-    router.push(`/despachos/${newManifest.id}`);
+    if (!selectedClient) {
+      setError('Debe seleccionar un destino comercial.');
+      return;
+    }
+    setError('');
+    setSubmitting(true);
+    try {
+      const { Id_Despacho } = await createShipment(selectedClient);
+      router.push(`/despachos/${Id_Despacho}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo crear el despacho');
+      setSubmitting(false);
+    }
   };
+
+  if (loading)
+    return (
+      <p className='text-xs font-mono text-muted-foreground p-4'>
+        Cargando clientes...
+      </p>
+    );
 
   return (
     <div className='max-w-md mx-auto space-y-4'>
@@ -35,7 +64,7 @@ export default function NuevoDespachoPage() {
           Apertura de Manifiesto
         </h1>
         <p className='text-xs text-muted-foreground'>
-          Inicia una nueva orden de salida logística.
+          Inicia una nueva orden de salida logística (estado pendiente).
         </p>
       </div>
 
@@ -49,21 +78,28 @@ export default function NuevoDespachoPage() {
           </label>
           <select
             value={selectedClient}
-            onChange={(e) =>
-              setSelectedClient(e.target.value)
-            }
+            onChange={(e) => setSelectedClient(Number(e.target.value))}
             className='w-full h-8 px-2 rounded-sm border border-input bg-background text-xs focus:outline-none cursor-pointer'
           >
-            <option value='' disabled>
-              -- Seleccione Sucursal / Cliente --
-            </option>
-            {destinations.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nombre}
+            {destinations.length === 0 ? (
+              <option value={0} disabled>
+                No hay clientes destino disponibles
               </option>
-            ))}
+            ) : (
+              destinations.map((c) => (
+                <option key={c.Id_Cliente} value={c.Id_Cliente}>
+                  {c.Nombre} ({c.Rol})
+                </option>
+              ))
+            )}
           </select>
         </div>
+
+        {error && (
+          <div className='rounded-sm border border-destructive/20 bg-destructive/10 px-2.5 py-2 text-[11px] text-destructive'>
+            {error}
+          </div>
+        )}
 
         <div className='flex justify-end space-x-2 pt-2 border-t border-border'>
           <button
@@ -75,9 +111,10 @@ export default function NuevoDespachoPage() {
           </button>
           <button
             type='submit'
-            className='h-8 px-4 bg-primary text-primary-foreground text-xs rounded-sm font-medium hover:opacity-90'
+            disabled={submitting || destinations.length === 0}
+            className='h-8 px-4 bg-primary text-primary-foreground text-xs rounded-sm font-medium hover:opacity-90 disabled:opacity-50'
           >
-            Crear Orden Estructural
+            {submitting ? 'Creando...' : 'Crear Orden'}
           </button>
         </div>
       </form>

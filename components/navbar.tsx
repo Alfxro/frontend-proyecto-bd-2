@@ -1,10 +1,20 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { getSession } from '@/services/api-config';
+import { logout } from '@/services/auth-service';
 
 export default function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const [usuario, setUsuario] = useState<string | null>(null);
+
+  useEffect(() => {
+    setUsuario(getSession()?.usuario ?? null);
+  }, [pathname]);
+
   if (pathname === '/login') return null;
 
   const links = [
@@ -15,6 +25,14 @@ export default function Navbar() {
     { label: 'Despachos', path: '/despachos' },
     { label: 'Auditoría', path: '/auditoria' }
   ];
+
+  const isActive = (path: string) =>
+    path === '/' ? pathname === '/' : pathname.startsWith(path);
+
+  const handleLogout = () => {
+    logout();
+    router.push('/login');
+  };
 
   return (
     <nav className='w-full bg-background border-b border-border sticky top-0 z-50'>
@@ -29,7 +47,7 @@ export default function Navbar() {
                 key={l.path}
                 href={l.path}
                 className={`h-8 px-2.5 flex items-center text-xs font-medium rounded-sm border ${
-                  pathname.startsWith(l.path) ?
+                  isActive(l.path) ?
                     'bg-muted border-border text-foreground font-semibold'
                   : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40'
                 }`}
@@ -41,17 +59,17 @@ export default function Navbar() {
         </div>
         <div className='flex items-center space-x-2 font-mono text-[11px] text-muted-foreground'>
           <span className='font-bold text-foreground'>
-            j.vargas
+            {usuario ?? '—'}
           </span>
           <span className='px-1 bg-muted border border-border rounded-sm text-[9px]'>
             OP
           </span>
-          <Link
-            href='/login'
-            className='hover:text-destructive pl-2'
+          <button
+            onClick={handleLogout}
+            className='hover:text-destructive pl-2 cursor-pointer'
           >
             Salir
-          </Link>
+          </button>
         </div>
       </div>
     </nav>

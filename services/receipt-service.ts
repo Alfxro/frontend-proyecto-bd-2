@@ -1,20 +1,31 @@
-import { MOCK_RECEIPTS, Receipt } from '@/lib/mock-data';
+import { apiFetch } from './api-config';
+import { RecepcionExtendida } from './types';
 
-export async function getReceipts(): Promise<Receipt[]> {
-  return new Promise((resolve) =>
-    setTimeout(() => resolve([...MOCK_RECEIPTS]), 200)
+export async function getReceipts(
+  fechaInicio?: string,
+  fechaFin?: string
+): Promise<RecepcionExtendida[]> {
+  const params = new URLSearchParams();
+  if (fechaInicio) params.set('fechaInicio', fechaInicio);
+  if (fechaFin) params.set('fechaFin', fechaFin);
+  const qs = params.toString();
+  return apiFetch<RecepcionExtendida[]>(
+    `/api/recepciones${qs ? `?${qs}` : ''}`
   );
 }
 
-export async function createReceipt(receipt: {
-  productId: number;
-  clientId: number;
-  quantity: number;
-  batch: string;
-}): Promise<boolean> {
-  console.log(
-    'Mock POST /recepciones (CALL sp_RegistrarRecepcion):',
-    receipt
-  );
-  return true;
+/**
+ * Registra una recepción invocando sp_RegistrarRecepcion (transacción ACID
+ * que incrementa el stock y deja el asiento de ingreso).
+ */
+export async function createReceipt(payload: {
+  Id_Producto: number;
+  Cantidad_Entrante: number;
+  Id_Cliente: number;
+  Numero_Lote: string;
+}): Promise<void> {
+  await apiFetch('/api/recepciones', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
 }

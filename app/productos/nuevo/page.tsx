@@ -2,39 +2,41 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { createProduct } from '@/services/product-service';
 
 export default function NuevoProductoPage() {
   const router = useRouter();
   const [form, setForm] = useState({
     code: '',
     name: '',
+    detail: '',
     criticalStock: 0,
     warehouse: '',
     aisle: '',
     shelf: ''
   });
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
     setSubmitting(true);
-
-    // Payload exacto según el esquema JSON del endpoint POST /productos
-    const payload = {
-      codigo: form.code,
-      nombre: form.name,
-      stockCritico: form.criticalStock,
-      bodega: form.warehouse,
-      pasillo: form.aisle,
-      estante: form.shelf
-    };
-
-    console.log('POST /productos', payload);
-
-    setTimeout(() => {
-      setSubmitting(false);
+    try {
+      await createProduct({
+        Codigo: form.code.trim(),
+        Nombre: form.name.trim(),
+        Detalle: form.detail.trim() || undefined,
+        Stock_Critico: form.criticalStock,
+        Bodega: form.warehouse.trim(),
+        Pasillo: form.aisle.trim(),
+        Estante: form.shelf.trim()
+      });
       router.push('/productos');
-    }, 400);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo crear el producto');
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -44,8 +46,8 @@ export default function NuevoProductoPage() {
           Registrar Producto
         </h1>
         <p className='text-xs text-muted-foreground mt-0.5'>
-          Defina las propiedades estructurales de la nueva
-          mercancía.
+          Defina las propiedades estructurales de la nueva mercancía. La
+          cantidad inicial en inventario es 0 (ingresa por recepciones).
         </p>
       </div>
 
@@ -105,6 +107,21 @@ export default function NuevoProductoPage() {
 
           <div className='space-y-1'>
             <label className='text-xs font-medium text-foreground'>
+              Detalle (opcional)
+            </label>
+            <input
+              type='text'
+              placeholder='Especificaciones adicionales'
+              value={form.detail}
+              onChange={(e) =>
+                setForm({ ...form, detail: e.target.value })
+              }
+              className='w-full h-8 px-3 rounded-sm border border-input bg-background text-xs text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
+            />
+          </div>
+
+          <div className='space-y-1'>
+            <label className='text-xs font-medium text-foreground'>
               Bodega de Almacenamiento
             </label>
             <input
@@ -113,10 +130,7 @@ export default function NuevoProductoPage() {
               placeholder='Ej. Bodega Principal Alajuela'
               value={form.warehouse}
               onChange={(e) =>
-                setForm({
-                  ...form,
-                  warehouse: e.target.value
-                })
+                setForm({ ...form, warehouse: e.target.value })
               }
               className='w-full h-8 px-3 rounded-sm border border-input bg-background text-xs text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
             />
@@ -133,10 +147,7 @@ export default function NuevoProductoPage() {
                 placeholder='Ej. Pasillo 3'
                 value={form.aisle}
                 onChange={(e) =>
-                  setForm({
-                    ...form,
-                    aisle: e.target.value
-                  })
+                  setForm({ ...form, aisle: e.target.value })
                 }
                 className='w-full h-8 px-3 rounded-sm border border-input bg-background text-xs text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
               />
@@ -151,15 +162,18 @@ export default function NuevoProductoPage() {
                 placeholder='Ej. Sección C'
                 value={form.shelf}
                 onChange={(e) =>
-                  setForm({
-                    ...form,
-                    shelf: e.target.value
-                  })
+                  setForm({ ...form, shelf: e.target.value })
                 }
                 className='w-full h-8 px-3 rounded-sm border border-input bg-background text-xs text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
               />
             </div>
           </div>
+
+          {error && (
+            <div className='rounded-sm border border-destructive/20 bg-destructive/10 px-2.5 py-2 text-[11px] text-destructive'>
+              {error}
+            </div>
+          )}
 
           <div className='flex items-center justify-end space-x-2 pt-2 border-t border-border'>
             <button
@@ -174,9 +188,7 @@ export default function NuevoProductoPage() {
               disabled={submitting}
               className='h-8 px-3 text-xs bg-primary text-primary-foreground rounded-sm hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50'
             >
-              {submitting ?
-                'Guardando...'
-              : 'Guardar Producto'}
+              {submitting ? 'Guardando...' : 'Guardar Producto'}
             </button>
           </div>
         </form>
